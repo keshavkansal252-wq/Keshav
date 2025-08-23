@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricketer Performance Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* Custom spinner for loading */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* For pre-wrap in insight section */
+        .whitespace-pre-wrap {
+            white-space: pre-wrap;
+        }
+        /* Responsive table styling */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
+        }
+        .min-w-full {
+            min-width: 600px; /* Ensure table is wide enough for content on small screens */
+        }
+        /* Chart container styling for responsiveness */
+        .chart-container {
+            position: relative;
+            height: 300px; /* Fixed height for charts */
+            width: 100%;
+            margin: auto;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-100 p-4 sm:p-6">
+    <div id="app-root" class="max-w-7xl mx-auto py-8">
+        <h1 class="text-5xl font-extrabold text-center text-gray-900 mb-10 leading-tight">
+            Cricketer Performance Dashboard
+        </h1>
+
+        <div id="loading-indicator" class="flex justify-center items-center h-[50vh] hidden">
+            <div class="spinner"></div>
+            <p class="ml-4 text-xl text-gray-700">Loading Cricketer Data...</p>
+        </div>
+
+        <div id="main-content">
+            <!-- Content will be rendered here by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // Global constants for API (declared once, conditionally to prevent redeclaration errors in some environments)
+        if (typeof GEMINI_API_KEY === 'undefined') {
+            var GEMINI_API_KEY = ''; // Canvas will provide at runtime
+        }
+        if (typeof GEMINI_API_URL === 'undefined') {
+            var GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+        }
+        if (typeof EXTERNAL_CRICKET_API_ENDPOINT === 'undefined') {
+            var EXTERNAL_CRICKET_API_ENDPOINT = 'YOUR_EXTERNAL_CRICKET_API_ENDPOINT_HERE'; // 🔗 Add your external cricket API endpoint here!
+        }
+
+
+        (function() { // Start of Immediately Invoked Function Expression (IIFE)
+            // Global state variables
+            let cricketers = [];
+            let searchTerm = '';
+            let selectedPlayer = null;
+            let loading = true;
+            let playerInsight = '';
+            let insightLoading = false;
+            let insightError = '';
+
+            // DOM element references
+            const appRoot = document.getElementById('app-root');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const mainContent = document.getElementById('main-content');
+
+            // Colors for the pie chart segments (for consistency)
+            const CHART_COLORS = [
+                '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#a05195',
+                '#d45087', '#f95d6a', '#ff7c43', '#ffa600', '#003f5c'
+            ];
+
+            // Mock Data for Cricketers (Only famous cricketers)
+            const MOCK_CRICKETERS = [
+              // --- Famous Cricketers ---
+              {
+                id: 'virat_kohli',
+                name: 'Virat Kohli',
+                country: 'India',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/16a34a/ffffff?text=VK',
+                battingStats: {
+                  Test: { matches: 113, runs: 8848, average: 49.15, strikeRate: 55.45 },
+                  ODI: { matches: 292, runs: 13848, average: 58.69, strikeRate: 93.62 },
+                  T20I: { matches: 117, runs: 4008, average: 51.75, strikeRate: 137.96 },
+                },
+                bowlingStats: {
+                  Test: { matches: 113, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 292, wickets: 4, average: 17.00, economy: 6.27 },
+                  T20I: { matches: 117, wickets: 4, average: 21.00, economy: 8.33 },
+                },
+              },
+              {
+                id: 'babar_azam',
+                name: 'Babar Azam',
+                country: 'Pakistan',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/3b82f6/ffffff?text=BA',
+                battingStats: {
+                  Test: { matches: 50, runs: 3880, average: 47.90, strikeRate: 48.01 },
+                  ODI: { matches: 124, runs: 6013, average: 56.72, strikeRate: 89.28 },
+                  T20I: { matches: 122, runs: 3772, average: 41.00, strikeRate: 129.54 },
+                },
+                bowlingStats: {
+                  Test: { matches: 50, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 124, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 122, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'mitch_starc',
+                name: 'Mitchell Starc',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/ef4444/ffffff?text=MS',
+                battingStats: {
+                  Test: { matches: 86, runs: 2368, average: 23.91, strikeRate: 67.22 },
+                  ODI: { matches: 121, runs: 733, average: 16.28, strikeRate: 104.57 },
+                  T20I: { matches: 60, runs: 120, average: 8.00, strikeRate: 100.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 86, wickets: 358, average: 27.68, economy: 3.40 },
+                  ODI: { matches: 121, wickets: 236, average: 22.30, economy: 5.15 },
+                  T20I: { matches: 60, wickets: 76, average: 24.57, economy: 7.64 },
+                },
+              },
+              {
+                id: 'ms_dhoni',
+                name: 'M.S. Dhoni',
+                country: 'India',
+                status: 'Retired (Int.)', // International retired, still plays leagues
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/f59e0b/ffffff?text=MSD',
+                battingStats: {
+                  Test: { matches: 90, runs: 4876, average: 38.09, strikeRate: 59.19 },
+                  ODI: { matches: 350, runs: 10773, average: 50.57, strikeRate: 87.56 },
+                  T20I: { matches: 98, runs: 1617, average: 37.60, strikeRate: 126.13 },
+                },
+                bowlingStats: {
+                  Test: { matches: 90, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 350, wickets: 1, average: 36.00, economy: 4.00 },
+                  T20I: { matches: 98, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'sachin_tendulkar',
+                name: 'Sachin Tendulkar',
+                country: 'India',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/0ea5e9/ffffff?text=ST',
+                battingStats: {
+                  Test: { matches: 200, runs: 15921, average: 53.78, strikeRate: 54.08 },
+                  ODI: { matches: 463, runs: 18426, average: 44.83, strikeRate: 86.23 },
+                  T20I: { matches: 1, runs: 10, average: 10.00, strikeRate: 111.11 },
+                },
+                bowlingStats: {
+                  Test: { matches: 200, wickets: 46, average: 54.17, economy: 3.01 },
+                  ODI: { matches: 463, wickets: 154, average: 44.48, economy: 5.10 },
+                  T20I: { matches: 1, wickets: 1, average: 12.00, economy: 6.00 },
+                },
+              },
+              {
+                id: 'ellyse_perry',
+                name: 'Ellyse Perry',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/9d174d/ffffff?text=EP',
+                battingStats: {
+                  Test: { matches: 14, runs: 938, average: 72.15, strikeRate: 53.60 },
+                  ODI: { matches: 139, runs: 3410, average: 50.14, strikeRate: 85.50 },
+                  T20I: { matches: 152, runs: 1729, average: 31.43, strikeRate: 120.73 },
+                },
+                bowlingStats: {
+                  Test: { matches: 14, wickets: 47, average: 19.80, economy: 2.70 },
+                  ODI: { matches: 139, wickets: 165, average: 25.40, economy: 4.40 },
+                  T20I: { matches: 152, wickets: 123, average: 19.40, economy: 6.90 },
+                },
+              },
+              {
+                id: 'rashid_khan',
+                name: 'Rashid Khan',
+                country: 'Afghanistan',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/6d28d9/ffffff?text=RK',
+                battingStats: {
+                  Test: { matches: 5, runs: 106, average: 11.77, strikeRate: 46.49 },
+                  ODI: { matches: 87, runs: 1150, average: 21.30, strikeRate: 104.90 },
+                  T20I: { matches: 82, runs: 345, average: 10.78, strikeRate: 136.60 },
+                },
+                bowlingStats: {
+                  Test: { matches: 5, wickets: 34, average: 22.35, economy: 3.39 },
+                  ODI: { matches: 87, wickets: 177, average: 18.57, economy: 4.21 },
+                  T20I: { matches: 82, wickets: 138, average: 14.28, economy: 6.22 },
+                },
+              },
+              {
+                id: 'shahid_afridi',
+                name: 'Shahid Afridi',
+                country: 'Pakistan',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/22c55e/ffffff?text=SA',
+                battingStats: {
+                  Test: { matches: 27, runs: 1716, average: 36.51, strikeRate: 67.50 },
+                  ODI: { matches: 398, runs: 8064, average: 23.57, strikeRate: 117.00 },
+                  T20I: { matches: 99, runs: 1416, average: 17.92, strikeRate: 150.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 27, wickets: 48, average: 35.60, economy: 3.35 },
+                  ODI: { matches: 398, wickets: 395, average: 34.50, economy: 4.62 },
+                  T20I: { matches: 99, wickets: 98, average: 24.44, economy: 6.71 },
+                },
+              },
+              {
+                id: 'meg_lanning',
+                name: 'Meg Lanning',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/be185d/ffffff?text=ML',
+                battingStats: {
+                  Test: { matches: 6, runs: 341, average: 34.10, strikeRate: 59.92 },
+                  ODI: { matches: 103, runs: 4602, average: 53.51, strikeRate: 92.40 },
+                  T20I: { matches: 132, runs: 3405, average: 36.61, strikeRate: 116.37 },
+                },
+                bowlingStats: {
+                  Test: { matches: 6, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 103, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 132, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'kane_williamson',
+                name: 'Kane Williamson',
+                country: 'New Zealand',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/fca5a5/ffffff?text=KW',
+                battingStats: {
+                  Test: { matches: 99, runs: 8263, average: 54.80, strikeRate: 46.50 },
+                  ODI: { matches: 161, runs: 6554, average: 47.83, strikeRate: 81.38 },
+                  T20I: { matches: 87, runs: 2464, average: 33.75, strikeRate: 123.37 },
+                },
+                bowlingStats: {
+                  Test: { matches: 99, wickets: 30, average: 40.50, economy: 2.70 },
+                  ODI: { matches: 161, wickets: 31, average: 42.10, economy: 4.80 },
+                  T20I: { matches: 87, wickets: 2, average: 48.00, economy: 7.20 },
+                },
+              },
+              {
+                id: 'ben_stokes',
+                name: 'Ben Stokes',
+                country: 'England',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/1e40af/ffffff?text=BS',
+                battingStats: {
+                  Test: { matches: 102, runs: 6117, average: 36.84, strikeRate: 59.90 },
+                  ODI: { matches: 110, runs: 3179, average: 39.73, strikeRate: 95.00 },
+                  T20I: { matches: 43, runs: 585, average: 21.66, strikeRate: 136.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 102, wickets: 204, average: 32.54, economy: 3.48 },
+                  ODI: { matches: 110, wickets: 74, average: 42.30, economy: 6.00 },
+                  T20I: { matches: 43, wickets: 26, average: 33.70, economy: 8.50 },
+                },
+              },
+              {
+                id: 'mithali_raj',
+                name: 'Mithali Raj',
+                country: 'India',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/c026d3/ffffff?text=MR',
+                battingStats: {
+                  Test: { matches: 12, runs: 699, average: 43.68, strikeRate: 40.50 },
+                  ODI: { matches: 232, runs: 7805, average: 50.68, strikeRate: 64.37 },
+                  T20I: { matches: 89, runs: 2364, average: 37.52, strikeRate: 105.57 },
+                },
+                bowlingStats: {
+                  Test: { matches: 12, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 232, wickets: 8, average: 31.00, economy: 4.00 },
+                  T20I: { matches: 89, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'shane_warne',
+                name: 'Shane Warne',
+                country: 'Australia',
+                status: 'Retired (Dec.)', // Denotes deceased
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/7c3aed/ffffff?text=SW',
+                battingStats: {
+                  Test: { matches: 145, runs: 3154, average: 17.30, strikeRate: 54.00 },
+                  ODI: { matches: 194, runs: 1018, average: 13.05, strikeRate: 72.60 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 145, wickets: 708, average: 25.41, economy: 2.47 },
+                  ODI: { matches: 194, wickets: 293, average: 25.73, economy: 4.25 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'jos_buttler',
+                name: 'Jos Buttler',
+                country: 'England',
+                status: 'Playing',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/dc2626/ffffff?text=JB',
+                battingStats: {
+                  Test: { matches: 57, runs: 2907, average: 30.28, strikeRate: 58.70 },
+                  ODI: { matches: 181, runs: 5040, average: 40.00, strikeRate: 117.80 },
+                  T20I: { matches: 114, runs: 2928, average: 34.04, strikeRate: 144.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 57, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 181, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 114, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'smriti_mandhana',
+                name: 'Smriti Mandhana',
+                country: 'India',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/f0ab0a/ffffff?text=SM',
+                battingStats: {
+                  Test: { matches: 6, runs: 339, average: 33.90, strikeRate: 59.85 },
+                  ODI: { matches: 84, runs: 3367, average: 43.16, strikeRate: 85.20 },
+                  T20I: { matches: 128, runs: 3179, average: 27.97, strikeRate: 123.50 },
+                },
+                bowlingStats: {
+                  Test: { matches: 6, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 84, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 128, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'ms_gayle',
+                name: 'Chris Gayle',
+                country: 'West Indies',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/84cc16/ffffff?text=CG',
+                battingStats: {
+                  Test: { matches: 103, runs: 7214, average: 42.18, strikeRate: 60.20 },
+                  ODI: { matches: 301, runs: 10480, average: 37.83, strikeRate: 85.11 },
+                  T20I: { matches: 79, runs: 1899, average: 27.92, strikeRate: 142.75 },
+                },
+                bowlingStats: {
+                  Test: { matches: 103, wickets: 73, average: 40.23, economy: 3.10 },
+                  ODI: { matches: 301, wickets: 167, average: 35.70, economy: 4.70 },
+                  T20I: { matches: 79, wickets: 20, average: 35.05, economy: 7.80 },
+                },
+              },
+              {
+                id: 'ab_devilliers',
+                name: 'AB de Villiers',
+                country: 'South Africa',
+                status: 'Retired',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/60a5fa/ffffff?text=ABD',
+                battingStats: {
+                  Test: { matches: 114, runs: 8765, average: 50.47, strikeRate: 54.50 },
+                  ODI: { matches: 228, runs: 9577, average: 53.50, strikeRate: 101.09 },
+                  T20I: { matches: 78, runs: 1672, average: 26.12, strikeRate: 135.16 },
+                },
+                bowlingStats: {
+                  Test: { matches: 114, wickets: 2, average: 48.00, economy: 2.70 },
+                  ODI: { matches: 228, wickets: 7, average: 30.14, economy: 5.00 },
+                  T20I: { matches: 78, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'steve_smith',
+                name: 'Steve Smith',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/fbbf24/ffffff?text=SS',
+                battingStats: {
+                  Test: { matches: 109, runs: 9634, average: 58.03, strikeRate: 53.80 },
+                  ODI: { matches: 154, runs: 5354, average: 43.88, strikeRate: 87.00 },
+                  T20I: { matches: 67, runs: 1008, average: 25.84, strikeRate: 126.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 109, wickets: 19, average: 53.68, economy: 3.10 },
+                  ODI: { matches: 154, wickets: 14, average: 50.00, economy: 5.50 },
+                  T20I: { matches: 67, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'joe_root',
+                name: 'Joe Root',
+                country: 'England',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/34d399/ffffff?text=JR',
+                battingStats: {
+                  Test: { matches: 140, runs: 11736, average: 50.15, strikeRate: 55.80 },
+                  ODI: { matches: 170, runs: 6523, average: 48.67, strikeRate: 86.50 },
+                  T20I: { matches: 32, runs: 893, average: 35.72, strikeRate: 126.30 },
+                },
+                bowlingStats: {
+                  Test: { matches: 140, wickets: 58, average: 45.70, economy: 3.00 },
+                  ODI: { matches: 170, wickets: 26, average: 40.15, economy: 5.20 },
+                  T20I: { matches: 32, wickets: 6, average: 30.00, economy: 7.50 },
+                },
+              },
+              {
+                id: 'jasprit_bumrah',
+                name: 'Jasprit Bumrah',
+                country: 'India',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/ef4444/ffffff?text=JB',
+                battingStats: {
+                  Test: { matches: 34, runs: 280, average: 6.82, strikeRate: 38.50 },
+                  ODI: { matches: 89, runs: 115, average: 5.22, strikeRate: 50.00 },
+                  T20I: { matches: 62, runs: 10, average: 3.33, strikeRate: 83.33 },
+                },
+                bowlingStats: {
+                  Test: { matches: 34, wickets: 140, average: 20.70, economy: 2.65 },
+                  ODI: { matches: 89, wickets: 149, average: 24.30, economy: 4.65 },
+                  T20I: { matches: 62, wickets: 74, average: 19.66, economy: 6.60 },
+                },
+              },
+              {
+                id: 'shaheen_afridi',
+                name: 'Shaheen Afridi',
+                country: 'Pakistan',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/10b981/ffffff?text=SA',
+                battingStats: {
+                  Test: { matches: 29, runs: 530, average: 12.04, strikeRate: 65.00 },
+                  ODI: { matches: 58, runs: 180, average: 10.00, strikeRate: 90.00 },
+                  T20I: { matches: 64, runs: 105, average: 10.50, strikeRate: 130.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 29, wickets: 113, average: 25.00, economy: 3.20 },
+                  ODI: { matches: 58, wickets: 110, average: 23.00, economy: 5.40 },
+                  T20I: { matches: 64, wickets: 82, average: 22.00, economy: 7.80 },
+                },
+              },
+              {
+                id: 'quinton_de_kock',
+                name: 'Quinton de Kock',
+                country: 'South Africa',
+                status: 'Playing (ODI/T20I)',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/fb7185/ffffff?text=QDK',
+                battingStats: {
+                  Test: { matches: 54, runs: 3300, average: 39.80, strikeRate: 70.00 },
+                  ODI: { matches: 153, runs: 6770, average: 45.74, strikeRate: 96.00 },
+                  T20I: { matches: 80, runs: 2277, average: 32.52, strikeRate: 138.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 54, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 153, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 80, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'pat_cummins',
+                name: 'Pat Cummins',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/0ea5e9/ffffff?text=PC',
+                battingStats: {
+                  Test: { matches: 62, runs: 1270, average: 15.50, strikeRate: 50.00 },
+                  ODI: { matches: 88, runs: 370, average: 10.00, strikeRate: 90.00 },
+                  T20I: { matches: 50, runs: 100, average: 10.00, strikeRate: 120.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 62, wickets: 239, average: 22.50, economy: 2.70 },
+                  ODI: { matches: 88, wickets: 141, average: 27.00, economy: 5.30 },
+                  T20I: { matches: 50, wickets: 55, average: 23.00, economy: 7.50 },
+                },
+              },
+              {
+                id: 'shakib_al_hasan',
+                name: 'Shakib Al Hasan',
+                country: 'Bangladesh',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/10b981/ffffff?text=SAH',
+                battingStats: {
+                  Test: { matches: 67, runs: 4690, average: 39.08, strikeRate: 62.00 },
+                  ODI: { matches: 247, runs: 7570, average: 37.00, strikeRate: 82.00 },
+                  T20I: { matches: 127, runs: 2500, average: 23.00, strikeRate: 122.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 67, wickets: 233, average: 31.00, economy: 3.10 },
+                  ODI: { matches: 247, wickets: 317, average: 29.00, economy: 4.80 },
+                  T20I: { matches: 127, wickets: 146, average: 20.00, economy: 6.80 },
+                },
+              },
+              {
+                id: 'r_ashwin',
+                name: 'Ravichandran Ashwin',
+                country: 'India',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/6b7280/ffffff?text=RA',
+                battingStats: {
+                  Test: { matches: 99, runs: 3200, average: 27.00, strikeRate: 55.00 },
+                  ODI: { matches: 113, runs: 707, average: 15.00, strikeRate: 80.00 },
+                  T20I: { matches: 65, runs: 184, average: 10.00, strikeRate: 110.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 99, wickets: 516, average: 23.00, economy: 2.70 },
+                  ODI: { matches: 113, wickets: 151, average: 33.00, economy: 4.90 },
+                  T20I: { matches: 65, wickets: 72, average: 23.00, economy: 7.00 },
+                },
+              },
+              {
+                id: 'david_warner',
+                name: 'David Warner',
+                country: 'Australia',
+                status: 'Retired (Test)',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/f59e0b/ffffff?text=DW',
+                battingStats: {
+                  Test: { matches: 112, runs: 8786, average: 44.59, strikeRate: 70.00 },
+                  ODI: { matches: 161, runs: 6932, average: 45.30, strikeRate: 97.00 },
+                  T20I: { matches: 110, runs: 3000, average: 33.00, strikeRate: 140.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 112, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 161, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 110, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'rohit_sharma',
+                name: 'Rohit Sharma',
+                country: 'India',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/3b82f6/ffffff?text=RS',
+                battingStats: {
+                  Test: { matches: 59, runs: 4137, average: 45.00, strikeRate: 56.00 },
+                  ODI: { matches: 262, runs: 10709, average: 49.00, strikeRate: 90.00 },
+                  T20I: { matches: 151, runs: 3974, average: 31.00, strikeRate: 140.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 59, wickets: 2, average: 60.00, economy: 3.00 },
+                  ODI: { matches: 262, wickets: 8, average: 50.00, economy: 5.50 },
+                  T20I: { matches: 151, wickets: 1, average: 50.00, economy: 8.00 },
+                },
+              },
+              // --- Additional Famous Cricketers ---
+              {
+                id: 'brian_lara',
+                name: 'Brian Lara',
+                country: 'West Indies',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/8b5cf6/ffffff?text=BL',
+                battingStats: {
+                  Test: { matches: 131, runs: 11953, average: 52.89, strikeRate: 60.50 },
+                  ODI: { matches: 299, runs: 10405, average: 40.48, strikeRate: 79.51 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 131, wickets: 4, average: 100.00, economy: 3.00 },
+                  ODI: { matches: 299, wickets: 4, average: 50.00, economy: 5.00 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'ricky_ponting',
+                name: 'Ricky Ponting',
+                country: 'Australia',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/059669/ffffff?text=RP',
+                battingStats: {
+                  Test: { matches: 168, runs: 13378, average: 51.85, strikeRate: 58.72 },
+                  ODI: { matches: 375, runs: 13704, average: 42.03, strikeRate: 80.39 },
+                  T20I: { matches: 17, runs: 401, average: 28.64, strikeRate: 132.89 },
+                },
+                bowlingStats: {
+                  Test: { matches: 168, wickets: 1, average: 150.00, economy: 3.50 },
+                  ODI: { matches: 375, wickets: 3, average: 60.00, economy: 5.00 },
+                  T20I: { matches: 17, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'jacques_kallis',
+                name: 'Jacques Kallis',
+                country: 'South Africa',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/ca8a04/ffffff?text=JK',
+                battingStats: {
+                  Test: { matches: 166, runs: 13289, average: 55.37, strikeRate: 45.97 },
+                  ODI: { matches: 328, runs: 11579, average: 44.36, strikeRate: 72.89 },
+                  T20I: { matches: 25, runs: 666, average: 35.05, strikeRate: 133.46 },
+                },
+                bowlingStats: {
+                  Test: { matches: 166, wickets: 292, average: 32.65, economy: 2.80 },
+                  ODI: { matches: 328, wickets: 273, average: 31.79, economy: 4.84 },
+                  T20I: { matches: 25, wickets: 12, average: 30.66, economy: 7.70 },
+                },
+              },
+              {
+                id: 'muttiah_muralitharan',
+                name: 'Muttiah Muralitharan',
+                country: 'Sri Lanka',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/ef4444/ffffff?text=MM',
+                battingStats: {
+                  Test: { matches: 133, runs: 1261, average: 11.70, strikeRate: 50.00 },
+                  ODI: { matches: 350, runs: 674, average: 6.80, strikeRate: 60.00 },
+                  T20I: { matches: 12, runs: 16, average: 4.00, strikeRate: 80.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 133, wickets: 800, average: 22.72, economy: 2.47 },
+                  ODI: { matches: 350, wickets: 534, average: 23.08, economy: 3.93 },
+                  T20I: { matches: 12, wickets: 13, average: 22.69, economy: 6.37 },
+                },
+              },
+              {
+                id: 'wasim_akram',
+                name: 'Wasim Akram',
+                country: 'Pakistan',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/3b82f6/ffffff?text=WA',
+                battingStats: {
+                  Test: { matches: 104, runs: 2898, average: 22.64, strikeRate: 70.00 },
+                  ODI: { matches: 356, runs: 3717, average: 16.52, strikeRate: 88.30 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 104, wickets: 414, average: 23.62, economy: 2.59 },
+                  ODI: { matches: 356, wickets: 502, average: 23.52, economy: 3.89 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'glenn_mcgrath',
+                name: 'Glenn McGrath',
+                country: 'Australia',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/10b981/ffffff?text=GM',
+                battingStats: {
+                  Test: { matches: 124, runs: 641, average: 7.36, strikeRate: 30.00 },
+                  ODI: { matches: 250, runs: 121, average: 3.80, strikeRate: 40.00 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 124, wickets: 563, average: 21.64, economy: 2.49 },
+                  ODI: { matches: 250, wickets: 381, average: 22.02, economy: 3.88 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'dale_steyn',
+                name: 'Dale Steyn',
+                country: 'South Africa',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/f59e0b/ffffff?text=DS',
+                battingStats: {
+                  Test: { matches: 93, runs: 1300, average: 13.97, strikeRate: 60.00 },
+                  ODI: { matches: 125, runs: 401, average: 10.02, strikeRate: 80.00 },
+                  T20I: { matches: 47, runs: 58, average: 7.25, strikeRate: 110.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 93, wickets: 439, average: 22.95, economy: 3.24 },
+                  ODI: { matches: 125, wickets: 196, average: 25.95, economy: 4.87 },
+                  T20I: { matches: 47, wickets: 64, average: 18.35, economy: 6.94 },
+                },
+              },
+              {
+                id: 'james_anderson',
+                name: 'James Anderson',
+                country: 'England',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/6b7280/ffffff?text=JA',
+                battingStats: {
+                  Test: { matches: 187, runs: 1300, average: 8.00, strikeRate: 25.00 },
+                  ODI: { matches: 194, runs: 400, average: 7.00, strikeRate: 50.00 },
+                  T20I: { matches: 19, runs: 20, average: 5.00, strikeRate: 70.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 187, wickets: 700, average: 26.00, economy: 2.90 },
+                  ODI: { matches: 194, wickets: 269, average: 29.00, economy: 4.90 },
+                  T20I: { matches: 19, wickets: 18, average: 30.00, economy: 7.80 },
+                },
+              },
+              {
+                id: 'kapil_dev',
+                name: 'Kapil Dev',
+                country: 'India',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/a855f7/ffffff?text=KD',
+                battingStats: {
+                  Test: { matches: 131, runs: 5248, average: 31.05, strikeRate: 69.90 },
+                  ODI: { matches: 225, runs: 3783, average: 23.79, strikeRate: 95.07 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 131, wickets: 434, average: 29.64, economy: 2.78 },
+                  ODI: { matches: 225, wickets: 253, average: 27.45, economy: 3.71 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'imran_khan',
+                name: 'Imran Khan',
+                country: 'Pakistan',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/ef4444/ffffff?text=IK',
+                battingStats: {
+                  Test: { matches: 88, runs: 3807, average: 37.69, strikeRate: 50.00 },
+                  ODI: { matches: 175, runs: 3709, average: 33.41, strikeRate: 72.65 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 88, wickets: 362, average: 22.81, economy: 2.54 },
+                  ODI: { matches: 175, wickets: 182, average: 26.61, economy: 3.89 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'kumar_sangakkara',
+                name: 'Kumar Sangakkara',
+                country: 'Sri Lanka',
+                status: 'Retired',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/3b82f6/ffffff?text=KS',
+                battingStats: {
+                  Test: { matches: 134, runs: 12400, average: 57.40, strikeRate: 54.19 },
+                  ODI: { matches: 404, runs: 14234, average: 41.98, strikeRate: 78.86 },
+                  T20I: { matches: 56, runs: 1382, average: 31.40, strikeRate: 119.50 },
+                },
+                bowlingStats: {
+                  Test: { matches: 134, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 404, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 56, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'mahela_jayawardene',
+                name: 'Mahela Jayawardene',
+                country: 'Sri Lanka',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/10b981/ffffff?text=MJ',
+                battingStats: {
+                  Test: { matches: 149, runs: 11814, average: 49.84, strikeRate: 50.00 },
+                  ODI: { matches: 448, runs: 12650, average: 33.37, strikeRate: 78.96 },
+                  T20I: { matches: 55, runs: 1493, average: 31.76, strikeRate: 133.18 },
+                },
+                bowlingStats: {
+                  Test: { matches: 149, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 448, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 55, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'rahul_dravid',
+                name: 'Rahul Dravid',
+                country: 'India',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/f59e0b/ffffff?text=RD',
+                battingStats: {
+                  Test: { matches: 164, runs: 13288, average: 52.31, strikeRate: 42.52 },
+                  ODI: { matches: 344, runs: 10889, average: 39.16, strikeRate: 71.24 },
+                  T20I: { matches: 1, runs: 31, average: 31.00, strikeRate: 140.90 },
+                },
+                bowlingStats: {
+                  Test: { matches: 164, wickets: 1, average: 100.00, economy: 3.00 },
+                  ODI: { matches: 344, wickets: 4, average: 42.00, economy: 5.00 },
+                  T20I: { matches: 1, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'sourav_ganguly',
+                name: 'Sourav Ganguly',
+                country: 'India',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/be185d/ffffff?text=SG',
+                battingStats: {
+                  Test: { matches: 113, runs: 7212, average: 42.17, strikeRate: 50.00 },
+                  ODI: { matches: 311, runs: 11363, average: 41.02, strikeRate: 73.70 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 113, wickets: 32, average: 50.00, economy: 3.00 },
+                  ODI: { matches: 311, wickets: 100, average: 38.49, economy: 5.00 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'yuvraj_singh',
+                name: 'Yuvraj Singh',
+                country: 'India',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/6d28d9/ffffff?text=YS',
+                battingStats: {
+                  Test: { matches: 40, runs: 1900, average: 33.92, strikeRate: 60.00 },
+                  ODI: { matches: 304, runs: 8701, average: 36.55, strikeRate: 87.67 },
+                  T20I: { matches: 58, runs: 1177, average: 28.02, strikeRate: 136.38 },
+                },
+                bowlingStats: {
+                  Test: { matches: 40, wickets: 9, average: 40.00, economy: 3.00 },
+                  ODI: { matches: 304, wickets: 111, average: 38.30, economy: 5.10 },
+                  T20I: { matches: 58, wickets: 28, average: 17.80, economy: 7.00 },
+                },
+              },
+              {
+                id: 'kevin_pietersen',
+                name: 'Kevin Pietersen',
+                country: 'England',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/dc2626/ffffff?text=KP',
+                battingStats: {
+                  Test: { matches: 104, runs: 8181, average: 47.28, strikeRate: 61.72 },
+                  ODI: { matches: 136, runs: 4440, average: 40.73, strikeRate: 86.58 },
+                  T20I: { matches: 37, runs: 1176, average: 37.93, strikeRate: 141.51 },
+                },
+                bowlingStats: {
+                  Test: { matches: 104, wickets: 10, average: 50.00, economy: 3.00 },
+                  ODI: { matches: 136, wickets: 7, average: 45.00, economy: 5.50 },
+                  T20I: { matches: 37, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'hashim_amla',
+                name: 'Hashim Amla',
+                country: 'South Africa',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/0ea5e9/ffffff?text=HA',
+                battingStats: {
+                  Test: { matches: 124, runs: 9282, average: 46.64, strikeRate: 49.86 },
+                  ODI: { matches: 181, runs: 8113, average: 49.46, strikeRate: 88.39 },
+                  T20I: { matches: 44, runs: 1277, average: 33.60, strikeRate: 132.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 124, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 181, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 44, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'viv_richards',
+                name: 'Viv Richards',
+                country: 'West Indies',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/84cc16/ffffff?text=VR',
+                battingStats: {
+                  Test: { matches: 121, runs: 8540, average: 50.23, strikeRate: 69.77 },
+                  ODI: { matches: 187, runs: 6721, average: 47.00, strikeRate: 90.20 },
+                  T20I: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                },
+                bowlingStats: {
+                  Test: { matches: 121, wickets: 32, average: 40.00, economy: 3.00 },
+                  ODI: { matches: 187, wickets: 118, average: 35.00, economy: 5.00 },
+                  T20I: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'adam_gilchrist',
+                name: 'Adam Gilchrist',
+                country: 'Australia',
+                status: 'Retired',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/f0ab0a/ffffff?text=AG',
+                battingStats: {
+                  Test: { matches: 96, runs: 5570, average: 47.60, strikeRate: 81.95 },
+                  ODI: { matches: 287, runs: 9619, average: 35.89, strikeRate: 96.94 },
+                  T20I: { matches: 13, runs: 272, average: 21.00, strikeRate: 141.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 96, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 287, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 13, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'sanath_jayasuriya',
+                name: 'Sanath Jayasuriya',
+                country: 'Sri Lanka',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/9d174d/ffffff?text=SJ',
+                battingStats: {
+                  Test: { matches: 110, runs: 6973, average: 40.07, strikeRate: 65.00 },
+                  ODI: { matches: 445, runs: 13430, average: 32.36, strikeRate: 91.30 },
+                  T20I: { matches: 31, runs: 629, average: 21.68, strikeRate: 150.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 110, wickets: 98, average: 34.00, economy: 3.00 },
+                  ODI: { matches: 445, wickets: 323, average: 36.79, economy: 4.78 },
+                  T20I: { matches: 31, wickets: 27, average: 20.00, economy: 7.00 },
+                },
+              },
+              {
+                id: 'virender_sehwag',
+                name: 'Virender Sehwag',
+                country: 'India',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/16a34a/ffffff?text=VS',
+                battingStats: {
+                  Test: { matches: 104, runs: 8586, average: 49.34, strikeRate: 82.23 },
+                  ODI: { matches: 251, runs: 8273, average: 35.05, strikeRate: 104.33 },
+                  T20I: { matches: 19, runs: 394, average: 22.00, strikeRate: 145.38 },
+                },
+                bowlingStats: {
+                  Test: { matches: 104, wickets: 40, average: 47.35, economy: 3.00 },
+                  ODI: { matches: 251, wickets: 96, average: 40.00, economy: 5.50 },
+                  T20I: { matches: 19, wickets: 6, average: 20.00, economy: 7.00 },
+                },
+              },
+              {
+                id: 'alastair_cook',
+                name: 'Alastair Cook',
+                country: 'England',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/34d399/ffffff?text=AC',
+                battingStats: {
+                  Test: { matches: 161, runs: 12472, average: 45.35, strikeRate: 46.95 },
+                  ODI: { matches: 92, runs: 3204, average: 36.40, strikeRate: 77.13 },
+                  T20I: { matches: 4, runs: 61, average: 15.25, strikeRate: 105.17 },
+                },
+                bowlingStats: {
+                  Test: { matches: 161, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 92, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 4, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'graeme_smith',
+                name: 'Graeme Smith',
+                country: 'South Africa',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/fca5a5/ffffff?text=GS',
+                battingStats: {
+                  Test: { matches: 117, runs: 9265, average: 48.25, strikeRate: 50.00 },
+                  ODI: { matches: 197, runs: 6989, average: 37.98, strikeRate: 81.17 },
+                  T20I: { matches: 33, runs: 982, average: 31.67, strikeRate: 132.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 117, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 197, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 33, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'charlotte_edwards',
+                name: 'Charlotte Edwards',
+                country: 'England',
+                status: 'Retired',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/be185d/ffffff?text=CE',
+                battingStats: {
+                  Test: { matches: 23, runs: 1676, average: 44.10, strikeRate: 45.00 },
+                  ODI: { matches: 191, runs: 5992, average: 38.16, strikeRate: 67.00 },
+                  T20I: { matches: 95, runs: 2605, average: 32.56, strikeRate: 115.70 },
+                },
+                bowlingStats: {
+                  Test: { matches: 23, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 191, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 95, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'suzie_bates',
+                name: 'Suzie Bates',
+                country: 'New Zealand',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/f0ab0a/ffffff?text=SB',
+                battingStats: {
+                  Test: { matches: 1, runs: 107, average: 53.50, strikeRate: 50.00 },
+                  ODI: { matches: 155, runs: 5543, average: 40.16, strikeRate: 77.00 },
+                  T20I: { matches: 152, runs: 3812, average: 29.55, strikeRate: 110.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 1, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 155, wickets: 125, average: 29.00, economy: 4.50 },
+                  T20I: { matches: 152, wickets: 55, average: 28.00, economy: 6.50 },
+                },
+              },
+              {
+                id: 'stafanie_taylor',
+                name: 'Stafanie Taylor',
+                country: 'West Indies',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/84cc16/ffffff?text=ST',
+                battingStats: {
+                  Test: { matches: 1, runs: 115, average: 57.50, strikeRate: 45.00 },
+                  ODI: { matches: 151, runs: 5501, average: 44.36, strikeRate: 74.00 },
+                  T20I: { matches: 113, runs: 3121, average: 35.06, strikeRate: 105.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 1, wickets: 1, average: 40.00, economy: 3.00 },
+                  ODI: { matches: 151, wickets: 153, average: 21.00, economy: 3.50 },
+                  T20I: { matches: 113, wickets: 98, average: 17.00, economy: 6.00 },
+                },
+              },
+              {
+                id: 'harmanpreet_kaur',
+                name: 'Harmanpreet Kaur',
+                country: 'India',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/c026d3/ffffff?text=HK',
+                battingStats: {
+                  Test: { matches: 3, runs: 161, average: 32.20, strikeRate: 50.00 },
+                  ODI: { matches: 130, runs: 3370, average: 38.29, strikeRate: 72.00 },
+                  T20I: { matches: 161, runs: 3370, average: 28.55, strikeRate: 105.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 3, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 130, wickets: 31, average: 30.00, economy: 4.50 },
+                  T20I: { matches: 161, wickets: 32, average: 25.00, economy: 6.00 },
+                },
+              },
+              {
+                id: 'alyssa_healy',
+                name: 'Alyssa Healy',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/60a5fa/ffffff?text=AH',
+                battingStats: {
+                  Test: { matches: 6, runs: 236, average: 23.60, strikeRate: 60.00 },
+                  ODI: { matches: 99, runs: 2824, average: 36.67, strikeRate: 98.00 },
+                  T20I: { matches: 147, runs: 2618, average: 24.93, strikeRate: 128.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 6, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 99, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 147, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'sophie_devine',
+                name: 'Sophie Devine',
+                country: 'New Zealand',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/fca5a5/ffffff?text=SD',
+                battingStats: {
+                  Test: { matches: 2, runs: 153, average: 38.25, strikeRate: 60.00 },
+                  ODI: { matches: 138, runs: 3410, average: 30.72, strikeRate: 90.00 },
+                  T20I: { matches: 125, runs: 2950, average: 29.50, strikeRate: 125.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 2, wickets: 2, average: 35.00, economy: 3.00 },
+                  ODI: { matches: 138, wickets: 90, average: 32.00, economy: 5.00 },
+                  T20I: { matches: 125, wickets: 110, average: 20.00, economy: 6.50 },
+                },
+              },
+              {
+                id: 'bret_lee',
+                name: 'Brett Lee',
+                country: 'Australia',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/ef4444/ffffff?text=BL',
+                battingStats: {
+                  Test: { matches: 76, runs: 1451, average: 20.15, strikeRate: 60.00 },
+                  ODI: { matches: 221, runs: 1170, average: 10.00, strikeRate: 90.00 },
+                  T20I: { matches: 25, runs: 50, average: 10.00, strikeRate: 120.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 76, wickets: 310, average: 30.81, economy: 3.46 },
+                  ODI: { matches: 221, wickets: 380, average: 23.36, economy: 4.76 },
+                  T20I: { matches: 25, wickets: 28, average: 25.50, economy: 7.50 },
+                },
+              },
+              {
+                id: 'shoaib_akhtar',
+                name: 'Shoaib Akhtar',
+                country: 'Pakistan',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/3b82f6/ffffff?text=SA',
+                battingStats: {
+                  Test: { matches: 46, runs: 757, average: 16.10, strikeRate: 65.00 },
+                  ODI: { matches: 163, runs: 541, average: 10.00, strikeRate: 80.00 },
+                  T20I: { matches: 15, runs: 20, average: 5.00, strikeRate: 100.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 46, wickets: 178, average: 25.70, economy: 3.30 },
+                  ODI: { matches: 163, wickets: 247, average: 24.97, economy: 4.76 },
+                  T20I: { matches: 15, wickets: 19, average: 22.00, economy: 7.50 },
+                },
+              },
+              {
+                id: 'daniel_vettori',
+                name: 'Daniel Vettori',
+                country: 'New Zealand',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/059669/ffffff?text=DV',
+                battingStats: {
+                  Test: { matches: 113, runs: 4531, average: 30.00, strikeRate: 50.00 },
+                  ODI: { matches: 295, runs: 2253, average: 17.00, strikeRate: 70.00 },
+                  T20I: { matches: 34, runs: 205, average: 15.00, strikeRate: 110.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 113, wickets: 362, average: 34.36, economy: 2.90 },
+                  ODI: { matches: 295, wickets: 305, average: 34.71, economy: 4.12 },
+                  T20I: { matches: 34, wickets: 38, average: 19.68, economy: 6.00 },
+                },
+              },
+              {
+                id: 'stuart_broad',
+                name: 'Stuart Broad',
+                country: 'England',
+                status: 'Retired',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/6b7280/ffffff?text=SB',
+                battingStats: {
+                  Test: { matches: 167, runs: 3662, average: 18.00, strikeRate: 50.00 },
+                  ODI: { matches: 121, runs: 600, average: 10.00, strikeRate: 80.00 },
+                  T20I: { matches: 56, runs: 100, average: 10.00, strikeRate: 120.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 167, wickets: 604, average: 27.68, economy: 3.00 },
+                  ODI: { matches: 121, wickets: 178, average: 30.13, economy: 5.00 },
+                  T20I: { matches: 56, wickets: 65, average: 22.93, economy: 7.50 },
+                },
+              },
+              {
+                id: 'abdul_razzaq',
+                name: 'Abdul Razzaq',
+                country: 'Pakistan',
+                status: 'Retired',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/be185d/ffffff?text=AR',
+                battingStats: {
+                  Test: { matches: 46, runs: 1946, average: 28.10, strikeRate: 55.00 },
+                  ODI: { matches: 265, runs: 5080, average: 29.70, strikeRate: 81.00 },
+                  T20I: { matches: 32, runs: 478, average: 20.78, strikeRate: 120.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 46, wickets: 100, average: 36.90, economy: 3.00 },
+                  ODI: { matches: 265, wickets: 269, average: 31.80, economy: 4.80 },
+                  T20I: { matches: 32, wickets: 20, average: 30.00, economy: 7.00 },
+                },
+              },
+              {
+                id: 'ms_gill',
+                name: 'Shubman Gill',
+                country: 'India',
+                status: 'Playing',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/16a34a/ffffff?text=SG',
+                battingStats: {
+                  Test: { matches: 25, runs: 1400, average: 32.00, strikeRate: 55.00 },
+                  ODI: { matches: 48, runs: 2400, average: 48.00, strikeRate: 95.00 },
+                  T20I: { matches: 15, runs: 450, average: 30.00, strikeRate: 140.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 25, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 48, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 15, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'travis_head',
+                name: 'Travis Head',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/fbbf24/ffffff?text=TH',
+                battingStats: {
+                  Test: { matches: 45, runs: 3000, average: 40.00, strikeRate: 70.00 },
+                  ODI: { matches: 60, runs: 2500, average: 45.00, strikeRate: 105.00 },
+                  T20I: { matches: 25, runs: 500, average: 25.00, strikeRate: 140.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 45, wickets: 10, average: 50.00, economy: 3.00 },
+                  ODI: { matches: 60, wickets: 20, average: 40.00, economy: 5.50 },
+                  T20I: { matches: 25, wickets: 5, average: 30.00, economy: 8.00 },
+                },
+              },
+              {
+                id: 'rachin_ravindra',
+                name: 'Rachin Ravindra',
+                country: 'New Zealand',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/fca5a5/ffffff?text=RR',
+                battingStats: {
+                  Test: { matches: 10, runs: 500, average: 30.00, strikeRate: 50.00 },
+                  ODI: { matches: 20, runs: 800, average: 40.00, strikeRate: 90.00 },
+                  T20I: { matches: 10, runs: 150, average: 20.00, strikeRate: 130.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 10, wickets: 15, average: 35.00, economy: 3.00 },
+                  ODI: { matches: 20, wickets: 25, average: 30.00, economy: 5.00 },
+                  T20I: { matches: 10, wickets: 10, average: 25.00, economy: 7.50 },
+                },
+              },
+              {
+                id: 'faf_du_plessis',
+                name: 'Faf du Plessis',
+                country: 'South Africa',
+                status: 'Retired (Int.)',
+                role: 'Batter',
+                profilePic: 'https://placehold.co/100x100/1e40af/ffffff?text=FdP',
+                battingStats: {
+                  Test: { matches: 69, runs: 4163, average: 40.00, strikeRate: 50.00 },
+                  ODI: { matches: 143, runs: 5507, average: 47.47, strikeRate: 86.00 },
+                  T20I: { matches: 50, runs: 1528, average: 35.53, strikeRate: 134.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 69, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 143, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 50, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'rishabh_pant',
+                name: 'Rishabh Pant',
+                country: 'India',
+                status: 'Playing',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/16a34a/ffffff?text=RP',
+                battingStats: {
+                  Test: { matches: 33, runs: 2271, average: 43.67, strikeRate: 72.65 },
+                  ODI: { matches: 30, runs: 865, average: 34.60, strikeRate: 106.65 },
+                  T20I: { matches: 66, runs: 987, average: 22.43, strikeRate: 126.37 },
+                },
+                bowlingStats: {
+                  Test: { matches: 33, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 30, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 66, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'hardik_pandya',
+                name: 'Hardik Pandya',
+                country: 'India',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/f59e0b/ffffff?text=HP',
+                battingStats: {
+                  Test: { matches: 11, runs: 532, average: 31.29, strikeRate: 73.80 },
+                  ODI: { matches: 86, runs: 1773, average: 33.45, strikeRate: 109.00 },
+                  T20I: { matches: 92, runs: 1348, average: 25.92, strikeRate: 140.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 11, wickets: 17, average: 31.00, economy: 3.50 },
+                  ODI: { matches: 86, wickets: 60, average: 38.00, economy: 5.50 },
+                  T20I: { matches: 92, wickets: 73, average: 26.00, economy: 8.00 },
+                },
+              },
+              {
+                id: 'mohammad_rizwan',
+                name: 'Mohammad Rizwan',
+                country: 'Pakistan',
+                status: 'Playing',
+                role: 'Wicketkeeper-Batter',
+                profilePic: 'https://placehold.co/100x100/3b82f6/ffffff?text=MR',
+                battingStats: {
+                  Test: { matches: 32, runs: 1463, average: 38.50, strikeRate: 50.00 },
+                  ODI: { matches: 70, runs: 1980, average: 39.60, strikeRate: 88.00 },
+                  T20I: { matches: 90, runs: 2981, average: 49.68, strikeRate: 127.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 32, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 70, wickets: 0, average: 0, economy: 0 },
+                  T20I: { matches: 90, wickets: 0, average: 0, economy: 0 },
+                },
+              },
+              {
+                id: 'shaheen_shah_afridi',
+                name: 'Shaheen Shah Afridi',
+                country: 'Pakistan',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/10b981/ffffff?text=SSA',
+                battingStats: {
+                  Test: { matches: 29, runs: 530, average: 12.04, strikeRate: 65.00 },
+                  ODI: { matches: 58, runs: 180, average: 10.00, strikeRate: 90.00 },
+                  T20I: { matches: 64, runs: 105, average: 10.50, strikeRate: 130.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 29, wickets: 113, average: 25.00, economy: 3.20 },
+                  ODI: { matches: 58, wickets: 110, average: 23.00, economy: 5.40 },
+                  T20I: { matches: 64, wickets: 82, average: 22.00, economy: 7.80 },
+                },
+              },
+              {
+                id: 'mitchell_marsh',
+                name: 'Mitchell Marsh',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/ef4444/ffffff?text=MM',
+                battingStats: {
+                  Test: { matches: 40, runs: 1945, average: 26.64, strikeRate: 60.00 },
+                  ODI: { matches: 90, runs: 2300, average: 32.00, strikeRate: 95.00 },
+                  T20I: { matches: 55, runs: 1300, average: 30.00, strikeRate: 135.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 40, wickets: 45, average: 38.00, economy: 3.50 },
+                  ODI: { matches: 90, wickets: 55, average: 35.00, economy: 5.50 },
+                  T20I: { matches: 55, wickets: 25, average: 30.00, economy: 8.00 },
+                },
+              },
+              {
+                id: 'tim_southee',
+                name: 'Tim Southee',
+                country: 'New Zealand',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/6b7280/ffffff?text=TS',
+                battingStats: {
+                  Test: { matches: 99, runs: 1900, average: 16.00, strikeRate: 65.00 },
+                  ODI: { matches: 153, runs: 600, average: 10.00, strikeRate: 90.00 },
+                  T20I: { matches: 122, runs: 250, average: 12.00, strikeRate: 130.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 99, wickets: 374, average: 29.00, economy: 3.20 },
+                  ODI: { matches: 153, wickets: 210, average: 32.00, economy: 5.50 },
+                  T20I: { matches: 122, wickets: 157, average: 23.00, economy: 7.80 },
+                },
+              },
+              {
+                id: 'kieron_pollard',
+                name: 'Kieron Pollard',
+                country: 'West Indies',
+                status: 'Retired (Int.)',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/8b5cf6/ffffff?text=KP',
+                battingStats: {
+                  Test: { matches: 0, runs: 0, average: 0, strikeRate: 0 },
+                  ODI: { matches: 123, runs: 2706, average: 26.00, strikeRate: 94.00 },
+                  T20I: { matches: 101, runs: 1569, average: 25.00, strikeRate: 135.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 0, wickets: 0, average: 0, economy: 0 },
+                  ODI: { matches: 123, wickets: 55, average: 38.00, economy: 5.50 },
+                  T20I: { matches: 101, wickets: 42, average: 30.00, economy: 8.00 },
+                },
+              },
+              {
+                id: 'moeen_ali',
+                name: 'Moeen Ali',
+                country: 'England',
+                status: 'Retired (Test)',
+                role: 'All-rounder',
+                profilePic: 'https://placehold.co/100x100/059669/ffffff?text=MA',
+                battingStats: {
+                  Test: { matches: 67, runs: 3099, average: 28.20, strikeRate: 60.00 },
+                  ODI: { matches: 129, runs: 1980, average: 24.00, strikeRate: 90.00 },
+                  T20I: { matches: 79, runs: 1100, average: 22.00, strikeRate: 140.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 67, wickets: 195, average: 36.00, economy: 3.50 },
+                  ODI: { matches: 129, wickets: 98, average: 40.00, economy: 5.00 },
+                  T20I: { matches: 79, wickets: 60, average: 28.00, economy: 7.50 },
+                },
+              },
+              {
+                id: 'jos_hazlewood',
+                name: 'Josh Hazlewood',
+                country: 'Australia',
+                status: 'Playing',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/fbbf24/ffffff?text=JH',
+                battingStats: {
+                  Test: { matches: 67, runs: 300, average: 8.00, strikeRate: 30.00 },
+                  ODI: { matches: 78, runs: 100, average: 5.00, strikeRate: 50.00 },
+                  T20I: { matches: 49, runs: 20, average: 5.00, strikeRate: 80.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 67, wickets: 249, average: 25.00, economy: 2.80 },
+                  ODI: { matches: 78, wickets: 126, average: 26.00, economy: 4.80 },
+                  T20I: { matches: 49, wickets: 64, average: 20.00, economy: 7.00 },
+                },
+              },
+              {
+                id: 'tren_boult',
+                name: 'Trent Boult',
+                country: 'New Zealand',
+                status: 'Playing (Limited Int.)',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/fca5a5/ffffff?text=TB',
+                battingStats: {
+                  Test: { matches: 78, runs: 700, average: 10.00, strikeRate: 40.00 },
+                  ODI: { matches: 115, runs: 200, average: 8.00, strikeRate: 60.00 },
+                  T20I: { matches: 58, runs: 50, average: 5.00, strikeRate: 90.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 78, wickets: 317, average: 27.00, economy: 3.00 },
+                  ODI: { matches: 115, wickets: 200, average: 25.00, economy: 5.00 },
+                  T20I: { matches: 58, wickets: 74, average: 23.00, economy: 7.50 },
+                },
+              },
+              {
+                id: 'jofra_archer',
+                name: 'Jofra Archer',
+                country: 'England',
+                status: 'Injured/Recovering',
+                role: 'Bowler',
+                profilePic: 'https://placehold.co/100x100/34d399/ffffff?text=JA',
+                battingStats: {
+                  Test: { matches: 13, runs: 300, average: 15.00, strikeRate: 50.00 },
+                  ODI: { matches: 21, runs: 50, average: 10.00, strikeRate: 70.00 },
+                  T20I: { matches: 15, runs: 10, average: 5.00, strikeRate: 80.00 },
+                },
+                bowlingStats: {
+                  Test: { matches: 13, wickets: 42, average: 31.00, economy: 3.50 },
+                  ODI: { matches: 21, wickets: 30, average: 28.00, economy: 5.50 },
+                  T20I: { matches: 15, wickets: 18, average: 25.00, economy: 8.00 },
+                },
+              },
+            ];
+
+            // EXTERNAL_CRICKET_API_ENDPOINT for external cricket data is still a placeholder.
+            const EXTERNAL_CRICKET_API_ENDPOINT = 'YOUR_EXTERNAL_CRICKET_API_ENDPOINT_HERE'; // 🔗 Add your external cricket API endpoint here!
+
+            // --- Utility Functions ---
+
+            // Function to create a DOM element with classes and text
+            function createElement(tag, classes = [], text = '', attributes = {}) {
+                const element = document.createElement(tag);
+                if (classes.length > 0) {
+                    element.className = classes.join(' ');
+                }
+                if (text) {
+                    element.textContent = text;
+                }
+                for (const key in attributes) {
+                    element.setAttribute(key, attributes[key]);
+                }
+                return element;
+            }
+
+            // Renders the list of cricketers
+            function renderCricketerList() {
+                const filteredCricketers = cricketers.filter(player =>
+                    player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    player.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    player.role.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+
+                let html = `
+                    <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+                        <div class="relative mb-8">
+                            <input
+                                type="text"
+                                id="search-input"
+                                placeholder="Search cricketers by name, country, or role..."
+                                class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg shadow-sm"
+                                value="${searchTerm}"
+                            />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
+                        <div id="cricketer-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                `;
+
+                if (filteredCricketers.length > 0) {
+                    filteredCricketers.forEach(player => {
+                        const statusClass = player.status === 'Playing' ? 'text-green-600' : (player.status.includes('Retired (Dec.)') ? 'text-red-700' : 'text-red-600');
+                        const statusIcon = player.status === 'Playing' ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-yellow-500"><path d="M17.2 11c-.4-1.5-2.1-2.6-3.8-2.6C10.7 8.4 9 9.5 8.8 11"/><path d="M15 2v2"/><path d="M13 18v2"/><path d="M21 7h-2.2"/><path d="M7.2 21.2 5.8 19.8"/><path d="M2.8 7h2.2"/><path d="M18.2 21.2 19.8 19.8"/><circle cx="12" cy="12" r="7"/></svg>` : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-red-500"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>`;
+
+                        html += `
+                            <div
+                                class="bg-white rounded-xl shadow-md p-4 flex flex-col md:flex-row items-center cursor-pointer hover:shadow-lg transition-all duration-200 ease-in-out transform hover:-translate-y-1"
+                                data-player-id="${player.id}"
+                            >
+                                <img
+                                    src="${player.profilePic}"
+                                    alt="${player.name}"
+                                    class="w-20 h-20 rounded-full object-cover border-2 border-gray-200 mb-3 md:mb-0 md:mr-4"
+                                    onerror="this.onerror=null;this.src='https://placehold.co/100x100/cccccc/333333?text=NO+PIC';"
+                                />
+                                <div class="flex-1 text-center md:text-left">
+                                    <h3 class="text-xl font-bold text-gray-900">${player.name}</h3>
+                                    <p class="text-gray-600">${player.country} - ${player.role}</p>
+                                    <div class="flex items-center justify-center md:justify-start gap-2 text-sm mt-1 font-semibold">
+                                        ${statusIcon}
+                                        <span class="${statusClass}">${player.status}</span>
+                                    </div>
+                                </div>
+                                <button
+                                    class="mt-4 md:mt-0 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    data-player-id="${player.id}"
+                                >
+                                    View Stats
+                                </button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p class="col-span-full text-center text-gray-600 text-lg">No cricketers found matching your search.</p>`;
+                }
+
+                html += `</div></div>`;
+                mainContent.innerHTML = html;
+
+                // Attach event listeners after rendering
+                document.getElementById('search-input').addEventListener('input', (event) => {
+                    searchTerm = event.target.value;
+                    renderApp();
+                });
+
+                document.querySelectorAll('#cricketer-cards-container .bg-white').forEach(card => {
+                    card.addEventListener('click', (event) => {
+                        const playerId = event.currentTarget.dataset.playerId;
+                        selectedPlayer = cricketers.find(p => p.id === playerId);
+                        playerInsight = ''; // Clear previous insight
+                        insightError = ''; // Clear previous error
+                        renderApp();
+                    });
+                });
+            }
+
+            // Renders the detailed player view
+            function renderPlayerDetail() {
+                if (!selectedPlayer) {
+                    mainContent.innerHTML = `
+                        <div class="flex flex-col items-center justify-center min-h-[60vh] p-4 bg-gray-50 rounded-lg shadow-inner">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-24 w-24 text-gray-400 mb-4"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                            <p class="text-xl text-gray-600 font-semibold">Select a player to see their stats.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const player = selectedPlayer;
+                const statusClass = player.status === 'Playing' ? 'text-green-600' : (player.status.includes('Retired (Dec.)') ? 'text-red-700' : 'text-red-600');
+                const statusIcon = player.status === 'Playing' ? `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-yellow-500"><path d="M17.2 11c-.4-1.5-2.1-2.6-3.8-2.6C10.7 8.4 9 9.5 8.8 11"/><path d="M15 2v2"/><path d="M13 18v2"/><path d="M21 7h-2.2"/><path d="M7.2 21.2 5.8 19.8"/><path d="M2.8 7h2.2"/><path d="M18.2 21.2 19.8 19.8"/><circle cx="12" cy="12" r="7"/></svg>` : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-red-500"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>`;
+
+                let battingStatsTableRows = '';
+                Object.entries(player.battingStats).forEach(([format, stats]) => {
+                    battingStatsTableRows += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${format}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.matches}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.runs}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.average > 0 ? stats.average : 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.strikeRate > 0 ? stats.strikeRate : 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                let bowlingStatsTableRows = '';
+                Object.entries(player.bowlingStats).forEach(([format, stats]) => {
+                    bowlingStatsTableRows += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${format}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.matches}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.wickets}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.average > 0 ? stats.average : 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${stats.economy > 0 ? stats.economy : 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                let html = `
+                    <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+                        <button id="back-button" class="mb-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out">
+                            &larr; Back to Player List
+                        </button>
+
+                        <!-- Player Header -->
+                        <div class="flex flex-col md:flex-row items-center md:items-start gap-6 pb-6 border-b border-gray-200 mb-6">
+                            <img
+                                src="${player.profilePic}"
+                                alt="${player.name}"
+                                class="w-32 h-32 rounded-full object-cover border-4 border-gray-300 shadow-md"
+                                onerror="this.onerror=null;this.src='https://placehold.co/100x100/cccccc/333333?text=NO+PIC';"
+                            />
+                            <div>
+                                <h2 class="text-4xl font-extrabold text-gray-900 mb-2">${player.name}</h2>
+                                <p class="text-xl text-gray-700 font-medium mb-2">${player.country} - ${player.role}</p>
+                                <div class="flex items-center gap-2 text-lg font-semibold">
+                                    ${statusIcon}
+                                    <span class="${statusClass}">${player.status}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Section -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Batting Statistics</h3>
+                                <div class="table-wrapper">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Format</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matches</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Runs</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Average</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Strike Rate</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            ${battingStatsTableRows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Bowling Statistics</h3>
+                                <div class="table-wrapper">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Format</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matches</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wickets</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Average</th>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Economy</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            ${bowlingStatsTableRows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                            <div class="bg-gray-50 p-4 rounded-lg shadow-inner flex flex-col items-center">
+                                <h4 class="text-xl font-semibold text-gray-800 mb-4">Batting Runs by Format</h4>
+                                <div class="chart-container">
+                                    <canvas id="battingRunsChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50 p-4 rounded-lg shadow-inner flex flex-col items-center">
+                                <h4 class="text-xl font-semibold text-gray-800 mb-4">Bowling Wickets by Format</h4>
+                                <div class="chart-container">
+                                    <canvas id="bowlingWicketsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gemini API Insight Section -->
+                        <div class="mt-10 pt-6 border-t border-gray-200">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-yellow-500"><path d="M15 14c.2-.8.7-1.5 1.4-2l1.1-.9c.7-.5 1.1-1.4 1.1-2.3V5c0-1.3-1-2.3-2.3-2.3H6.3C5 2.7 4 3.7 4 5v4c0 .9.4 1.8 1.1 2.3l1.1.9c.7.5 1.2 1.2 1.4 2"/><path d="M12 15v5"/><path d="M12 22h.01"/><path d="M12 12V5"/></svg>
+                                Player Insight (Powered by Gemini)
+                            </h3>
+                            <button id="get-insight-button"
+                                class="mb-4 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-md hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200 ease-in-out flex items-center gap-2"
+                                ${insightLoading ? 'disabled' : ''}
+                            >
+                                ${insightLoading ? `
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                    Generating Insight...
+                                ` : `
+                                    ✨ Get Player Insight ✨
+                                `}
+                            </button>
+
+                            <p id="insight-error" class="text-red-600 bg-red-100 p-3 rounded-lg mt-2 ${insightError ? '' : 'hidden'}">${insightError}</p>
+
+                            <div id="player-insight-display" class="bg-blue-50 p-4 rounded-lg shadow-inner text-gray-800 leading-relaxed ${playerInsight ? '' : 'hidden'}">
+                                <p class="whitespace-pre-wrap">${playerInsight}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                mainContent.innerHTML = html;
+
+                // Attach event listeners for the detail view
+                document.getElementById('back-button').addEventListener('click', () => {
+                    selectedPlayer = null;
+                    playerInsight = ''; // Clear insight when going back
+                    insightError = ''; // Clear error when going back
+                    renderApp();
+                });
+
+                document.getElementById('get-insight-button').addEventListener('click', getPlayerInsight);
+
+                // --- Initialize Charts after DOM is rendered ---
+                initCharts(player);
+            }
+
+            // Main render function to update the UI
+            function renderApp() {
+                if (loading) {
+                    loadingIndicator.classList.remove('hidden');
+                    mainContent.classList.add('hidden');
+                } else {
+                    loadingIndicator.classList.add('hidden');
+                    mainContent.classList.remove('hidden');
+                    if (selectedPlayer) {
+                        renderPlayerDetail();
+                    } else {
+                        renderCricketerList();
+                    }
+                }
+            }
+
+            // --- Chart.js Initialization Function ---
+            let battingChartInstance = null;
+            let bowlingChartInstance = null;
+
+            function initCharts(player) {
+                // Destroy existing chart instances if they exist
+                if (battingChartInstance) {
+                    battingChartInstance.destroy();
+                }
+                if (bowlingChartInstance) {
+                    bowlingChartInstance.destroy();
+                }
+
+                // Batting Runs Chart
+                const battingRunsData = Object.keys(player.battingStats).map(format => ({
+                    name: format,
+                    value: player.battingStats[format].runs,
+                })).filter(data => data.value > 0);
+
+                if (battingRunsData.length > 0) {
+                    const battingCtx = document.getElementById('battingRunsChart').getContext('2d');
+                    battingChartInstance = new Chart(battingCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: battingRunsData.map(d => d.name),
+                            datasets: [{
+                                data: battingRunsData.map(d => d.value),
+                                backgroundColor: CHART_COLORS.slice(0, battingRunsData.length),
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
+                                title: {
+                                    display: false, // Title handled by h4 tag
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Bowling Wickets Chart
+                const bowlingWicketsData = Object.keys(player.bowlingStats).map(format => ({
+                    name: format,
+                    value: player.bowlingStats[format].wickets,
+                })).filter(data => data.value > 0);
+
+                if (bowlingWicketsData.length > 0) {
+                    const bowlingCtx = document.getElementById('bowlingWicketsChart').getContext('2d');
+                    bowlingChartInstance = new Chart(bowlingCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: bowlingWicketsData.map(d => d.name),
+                            datasets: [{
+                                label: 'Wickets',
+                                data: bowlingWicketsData.map(d => d.value),
+                                backgroundColor: CHART_COLORS.slice(0, bowlingWicketsData.length),
+                                borderColor: CHART_COLORS.slice(0, bowlingWicketsData.length).map(color => color.replace('0.2)', '1)')), // Darker border
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false, // Label is 'Wickets'
+                                },
+                                title: {
+                                    display: false,
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+
+            async function getPlayerInsight() {
+                // IMPORTANT: The GEMINI_API_KEY and GEMINI_API_URL are now accessed from the global scope.
+                // They are conditionally declared at the very top of the script to prevent redeclaration errors.
+
+                insightLoading = true;
+                insightError = '';
+                playerInsight = ''; // Clear previous insight
+                renderApp(); // Update UI to show loading state
+
+                // Construct a detailed prompt from player stats
+                const prompt = `Analyze the cricket performance of ${selectedPlayer.name} from ${selectedPlayer.country}.
+                  Their role is ${selectedPlayer.role}.
+                  Batting Stats:
+                  ${Object.entries(selectedPlayer.battingStats).map(([format, stats]) =>
+                    `${format} - Matches: ${stats.matches}, Runs: ${stats.runs}, Average: ${stats.average}, Strike Rate: ${stats.strikeRate}`
+                  ).join('; \n')}
+                  Bowling Stats:
+                  ${Object.entries(selectedPlayer.bowlingStats).map(([format, stats]) =>
+                    `${format} - Matches: ${stats.matches}, Wickets: ${stats.wickets}, Average: ${stats.average}, Economy: ${stats.economy}`
+                  ).join('; \n')}
+                  Based on these statistics, provide a concise summary (around 150-200 words) of their strengths, weaknesses, and overall impact across formats. Focus on key numbers and trends, and highlight what makes them a notable player.`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+
+                // Implement exponential backoff for API calls
+                const makeApiCallWithBackoff = async (retries = 0) => {
+                    const MAX_RETRIES = 5;
+                    const BASE_DELAY_MS = 1000; // 1 second
+
+                    try {
+                        const response = await fetch(GEMINI_API_URL, { // Accessing global GEMINI_API_URL
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            if (response.status === 429 && retries < MAX_RETRIES) {
+                                const delay = BASE_DELAY_MS * Math.pow(2, retries) + Math.random() * 1000;
+                                await new Promise(res => setTimeout(res, delay));
+                                return makeApiCallWithBackoff(retries + 1);
+                            }
+                            throw new Error(`API error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+
+                        if (result.candidates && result.candidates.length > 0 &&
+                            result.candidates[0].content && result.candidates[0].content.parts &&
+                            result.candidates[0].content.parts.length > 0) {
+                            playerInsight = result.candidates[0].content.parts[0].text;
+                        } else {
+                            insightError = 'Could not generate insight. Unexpected API response structure.';
+                        }
+                    } catch (err) {
+                        console.error("Gemini API call failed:", err);
+                        insightError = `Failed to get insight: ${err.message}. Please try again.`;
+                    } finally {
+                        insightLoading = false;
+                        renderApp(); // Update UI to show result or error
+                    }
+                };
+
+                makeApiCallWithBackoff();
+            }
+
+            // --- Initial Data Fetch and App Render ---
+
+            // Simulate fetching data on window load
+            window.onload = function() {
+                // In a real application, you would fetch data from an external API here
+                // Example:
+                // const EXTERNAL_CRICKET_API_KEY = 'YOUR_EXTERNAL_CRICKET_API_KEY'; // Your external API key
+                // const EXTERNAL_CRICKET_API_ENDPOINT_URL = EXTERNAL_CRICKET_API_ENDPOINT; // Using global constant
+                // fetch(`${EXTERNAL_CRICKET_API_ENDPOINT_URL}/players?api_key=${EXTERNAL_CRICKET_API_KEY}`)
+                //   .then(response => response.json())
+                //   .then(data => {
+                //     // Transform data if necessary
+                //     cricketers = data.players.map(apiPlayer => ({
+                //       id: apiPlayer.id,
+                //       name: apiPlayer.full_name,
+                //       country: apiPlayer.country,
+                //       status: apiPlayer.status,
+                //       role: apiPlayer.role,
+                //       profilePic: apiPlayer.image_url || 'https://placehold.co/100x100/cccccc/333333?text=NO+PIC',
+                //       battingStats: { /* map API batting stats here */ },
+                //       bowlingStats: { /* map API bowling stats here */ },
+                //     }));
+                //     loading = false;
+                //     renderApp();
+                //   })
+                //   .catch(error => {
+                //     console.error("Failed to fetch external cricketer data:", error);
+                //     // Fallback to mock data or display error
+                //     cricketers = MOCK_CRICKETERS;
+                //     loading = false;
+                //     renderApp();
+                //   });
+
+                // For now, use mock data after a delay
+                setTimeout(() => {
+                    cricketers = MOCK_CRICKETERS;
+                    loading = false;
+                    renderApp();
+                }, 1000); // Simulate network delay
+            };
+        })(); // End of IIFE
+    </script>
+</body>
+</html>
