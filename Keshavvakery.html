@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mimmi's Bakery - Freshly Baked Happiness Everyday</title>
+    <meta name="description" content="Mimmi's Bakery - Traditional family recipes, fresh ingredients, handmade with love. Visit us for cakes, breads, pastries, and more!">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #8B4513;
+            --secondary: #D2691E;
+            --accent: #FFB347;
+            --text: #333;
+            --light: #FFF8F0;
+            --white: #FFFFFF;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            --primary: #D2691E;
+            --secondary: #FFB347;
+            --accent: #FFA500;
+            --text: #F5F5F5;
+            --light: #2C2416;
+            --white: #1A1512;
+            --shadow: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            color: var(--text);
+            background: var(--light);
+            transition: all 0.3s ease;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: var(--white);
+            box-shadow: 0 2px 10px var(--shadow);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'Playfair Display', serif;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            transition: color 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: var(--secondary);
+        }
+
+        .theme-toggle {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: var(--secondary);
+            transform: scale(1.05);
+        }
+
+        .mobile-menu {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        /* Hero Section */
+        .hero {
+            margin-top: 80px;
+            height: 90vh;
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
+                        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23FFE4B5"/><stop offset="100%" style="stop-color:%23FFDAB9"/></linearGradient></defs><rect fill="url(%23bg)" width="1200" height="800"/><g fill-opacity="0.3"><circle fill="%23D2691E" cx="200" cy="200" r="150"/><circle fill="%23FFB347" cx="1000" cy="600" r="200"/><circle fill="%238B4513" cx="600" cy="400" r="180"/></g><text x="600" y="400" font-family="serif" font-size="48" fill="%238B4513" text-anchor="middle">Fresh Bakery</text></svg>');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            position: relative;
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .hero-content h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: slideDown 1s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .hero-content p {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            font-weight: 300;
+            animation: slideUp 1s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeIn 1.5s ease;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        /* Menu Preview */
+        .menu-preview {
+            padding: 5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            color: var(--text);
+            margin-bottom: 3rem;
+            opacity: 0.8;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .menu-card {
+            background: var(--white);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px var(--shadow);
+        }
+
+        .menu-card-img {
+            height: 200px;
+            background: linear-gradient(135deg, var(--accent), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: white;
+        }
+
+        .menu-card-content {
+            padding: 1.5rem;
+        }
+
+        .menu-card h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+        }
+
+        .menu-card p {
+            color: var(--text);
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+
+        .price {
+            font-size: 1.3rem;
+            color: var(--secondary);
+            font-weight: 700;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-left: 0.5rem;
+        }
+
+        /* Story Section */
+        .story {
+            background: var(--white);
+            padding: 5rem 2rem;
+        }
+
+        .story-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: center;
+        }
+
+        .story-content h2 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .story-content p {
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+            color: var(--text);
+        }
+
+        .story-image {
+            background: linear-gradient(135deg, var(--accent), var(--secondary));
+            height: 400px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            color: white;
+            box-shadow: 0 10px 30px var(--shadow);
+        }
+
+        /* Special Section */
+        .special {
+            padding: 5rem 2rem;
+            background: linear-gradient(135deg, rgba(139, 69, 19, 0.05), rgba(210, 105, 30, 0.05));
+        }
+
+        .special-grid {
+            max-width: 1200px;
+            margin: 3rem auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .special-card {
+            text-align: center;
+            padding: 2rem;
+            background: var(--white);
+            border-radius: 15px;
+            box-shadow: 0 5px 15px var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .special-card:hover {
+            transform: scale(1.05);
+        }
+
+        .special-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .special-card h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        /* Testimonials */
+        .testimonials {
+            padding: 5rem 2rem;
+            background: var(--white);
+        }
+
+        .testimonial-grid {
+            max-width: 1200px;
+            margin: 3rem auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .testimonial {
+            padding: 2rem;
+            background: var(--light);
+            border-radius: 15px;
+            position: relative;
+        }
+
+        .testimonial::before {
+            content: '"';
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            font-size: 4rem;
+            color: var(--accent);
+            font-family: serif;
+        }
+
+        .testimonial p {
+            font-style: italic;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .testimonial-author {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Contact */
+        .contact {
+            padding: 5rem 2rem;
+            background: linear-gradient(135deg, rgba(139, 69, 19, 0.05), rgba(210, 105, 30, 0.05));
+        }
+
+        .contact-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+        }
+
+        .contact-info {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+
+        .contact-info h3 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .info-item span {
+            margin-right: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .contact-form {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: var(--light);
+            color: var(--text);
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(210, 105, 30, 0.1);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--primary);
+            color: white;
+            padding: 3rem 2rem 1rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .social-links a {
+            color: white;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .social-links a:hover {
+            transform: translateY(-5px);
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 2rem;
+            padding-top: 1rem;
+        }
+
+        /* Newsletter */
+        .newsletter {
+            background: var(--secondary);
+            padding: 2rem;
+            border-radius: 15px;
+            margin: 2rem auto;
+            max-width: 600px;
+            text-align: center;
+            color: white;
+        }
+
+        .newsletter h3 {
+            margin-bottom: 1rem;
+        }
+
+        .newsletter-form {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .newsletter-form input {
+            flex: 1;
+            padding: 0.8rem;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+        }
+
+        .newsletter-form button {
+            padding: 0.8rem 2rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .newsletter-form button:hover {
+            background: var(--accent);
+            transform: scale(1.05);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu {
+                display: block;
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-content p {
+                font-size: 1.2rem;
+            }
+
+            .story-container,
+            .contact-container {
+                grid-template-columns: 1fr;
+            }
+
+            .newsletter-form {
+                flex-direction: column;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+        }
+
+        /* Mobile Navigation */
+        .mobile-nav {
+            position: fixed;
+            top: 80px;
+            left: -100%;
+            width: 100%;
+            height: calc(100vh - 80px);
+            background: var(--white);
+            transition: left 0.3s ease;
+            z-index: 999;
+        }
+
+        .mobile-nav.active {
+            left: 0;
+        }
+
+        .mobile-nav-links {
+            list-style: none;
+            padding: 2rem;
+        }
+
+        .mobile-nav-links li {
+            margin-bottom: 1.5rem;
+        }
+
+        .mobile-nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Loading Animation */
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--white);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loader-circle {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--light);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loader -->
+    <div class="loader" id="loader">
+        <div class="loader-circle"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo">🥐 Mimmi's Bakery</div>
+            <ul class="nav-links">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#menu">Menu</a></li>
+                <li><a href="#story">Our Story</a></li>
+                <li><a href="#special">Why Us</a></li>
+                <li><a href="#contact">Contact</a></li>
+                <li><button class="theme-toggle" onclick="toggleTheme()">🌙</button></li>
+            </ul>
+            <button class="mobile-menu" onclick="toggleMobileMenu()">☰</button>
+        </div>
+    </nav>
+
+    <!-- Mobile Navigation -->
+    <div class="mobile-nav" id="mobileNav">
+        <ul class="mobile-nav-links">
+            <li><a href="#home" onclick="toggleMobileMenu()">Home</a></li>
+            <li><a href="#menu" onclick="toggleMobileMenu()">Menu</a></li>
+            <li><a href="#story" onclick="toggleMobileMenu()">Our Story</a></li>
+            <li><a href="#special" onclick="toggleMobileMenu()">Why Us</a></li>
+            <li><a href="#contact" onclick="toggleMobileMenu()">Contact</a></li>
+            <li><button class="theme-toggle" onclick="toggleTheme()">🌙 Dark Mode</button></li>
+        </ul>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h1>Freshly Baked Happiness Everyday</h1>
+            <p>At Mimmi's Bakery, every bite tells a story – made fresh, made with love</p>
+            <div class="hero-buttons">
+                <a href="#menu" class="btn btn-primary">View Menu</a>
+                <a href="#" class="btn btn-secondary">Order Online</a>
+                <a href="#contact" class="btn btn-secondary">Visit Us</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Menu Preview -->
+    <section class="menu-preview" id="menu">
+        <h2 class="section-title fade-in">Our Delicious Menu</h2>
+        <p class="section-subtitle fade-in">Handcrafted with love, baked to perfection</p>
+        
+        <div class="menu-grid fade-in">
+            <div class="menu-card">
+                <div class="menu-card-img">🎂</div>
+                <div class="menu-card-content">
+                    <h3>Chocolate Dream Cake</h3>
+                    <p>Rich, moist chocolate cake with Belgian chocolate ganache</p>
+                    <span class="price">$45</span>
+                    <span class="badge">Best Seller</span>
+                </div>
+            </div>
+
+            <div class="menu-card">
+                <div class="menu-card-img">🥖</div>
+                <div class="menu-card-content">
+                    <h3>Artisan Sourdough</h3>
+                    <p>Traditional 48-hour fermented sourdough bread</p>
+                    <span class="price">$8</span>
+                </div>
+            </div>
+
+            <div class="menu-card">
+                <div class="menu-card-img">🥐</div>
+                <div class="menu-card-content">
+                    <h3>Butter Croissants</h3>
+                    <p>Flaky, buttery French croissants made fresh daily</p>
+                    <span class="price">$4</span>
+                    <span class="badge">Popular</span>
+                </div>
+            </div>
+
+            <div class="menu-card">
+                <div class="menu-card-img">🍪</div>
+                <div class="menu-card-content">
+                    <h3>Grandma's Cookies</h3>
+                    <p>Classic chocolate chip cookies from our family recipe</p>
+                    <span class="price">$12/dozen</span>
+                </div>
+            </div>
+
+            <div class="menu-card">
+                <div class="menu-card-img">🧁</div>
+                <div class="menu-card-content">
+                    <h3>Red Velvet Cupcakes</h3>
+                    <p>Velvety smooth cupcakes with cream cheese frosting</p>
+                    <span class="price">$3.50</span>
+                </div>
+            </div>
+
+            <div class="menu-card">
+                <div class="menu-card-img">🥧</div>
+                <div class="menu-card-content">
+                    <h3>Apple Pie</h3>
+                    <p>Traditional apple pie with cinnamon and brown sugar</p>
+                    <span class="price">$25</span>
+                    <span class="badge">Seasonal</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="#" class="btn btn-primary">View Full Menu</a>
+        </div>
+    </section>
+
+    <!-- Story Section -->
+    <section class="story" id="story">
+        <div class="story-container fade-in">
+            <div class="story-content">
+                <h2>The Story of Mimmi's Bakery</h2>
+                <p>Founded in 1985 by Mimmi Anderson, our bakery started as a small family kitchen where love was the main ingredient. What began as baking for neighbors and friends quickly grew into a beloved community bakery.</p>
+                <p>Three generations later, we still use Grandma Mimmi's original recipes, passed down with the same dedication to quality and tradition. Every morning, our bakers arrive before dawn to ensure everything is fresh for you.</p>
+                <p>We believe in the magic of handmade goods, the importance of real ingredients, and the power of a warm smile with every purchase. This isn't just a bakery – it's where memories are made, one bite at a time.</p>
+                <a href="#" class="btn btn-primary">Learn More About Us</a>
+            </div>
+            <div class="story-image">
+                👩‍🍳
+            </div>
+        </div>
+    </section>
+
+    <!-- Special Section -->
+    <section class="special" id="special">
+        <h2 class="section-title fade-in">What Makes Us Special</h2>
+        <p class="section-subtitle fade-in">Quality, tradition, and love in every bite</p>
+        
+        <div class="special-grid fade-in">
+            <div class="special-card">
+                <div class="special-icon">🌾</div>
+                <h3>Fresh Ingredients</h3>
+                <p>We source the finest organic flour, farm-fresh eggs, and real butter. No preservatives, ever.</p>
+            </div>
+
+            <div class="special-card">
+                <div class="special-icon">📜</div>
+                <h3>Family Recipes</h3>
+                <p>Secret recipes passed down through three generations, each one perfected with time and love.</p>
+            </div>
+
+            <div class="special-card">
+                <div class="special-icon">🌅</div>
+                <h3>Daily Fresh</h3>
+                <p>Everything is baked fresh every morning. We never sell day-old products – quality is our promise.</p>
+            </div>
+
+            <div class="special-card">
+                <div class="special-icon">❤️</div>
+                <h3>Made with Love</h3>
+                <p>Every item is handcrafted with care and attention to detail. You can taste the difference!</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <h2 class="section-title fade-in">What Our Customers Say</h2>
+        <p class="section-subtitle fade-in">Join our family of happy customers</p>
+        
+        <div class="testimonial-grid fade-in">
+            <div class="testimonial">
+                <p>The best bakery in town! Their chocolate cake is to die for, and the staff always greets you with a smile. It feels like home.</p>
+                <div class="testimonial-author">- Sarah Johnson</div>
+            </div>
+
+            <div class="testimonial">
+                <p>I've been coming here for 10 years. The quality never drops, and they remember my usual order. That's what I call service!</p>
+                <div class="testimonial-author">- Michael Chen</div>
+            </div>
+
+            <div class="testimonial">
+                <p>Mimmi's Bakery made our wedding cake, and it was absolutely perfect! Beautiful, delicious, and everyone asked where it was from.</p>
+                <div class="testimonial-author">- Emma & David Wilson</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter -->
+    <div class="newsletter fade-in">
+        <h3>🍰 Get Sweet Offers in Your Inbox!</h3>
+        <p>Subscribe to our newsletter for exclusive deals and new menu updates</p>
+        <form class="newsletter-form" onsubmit="subscribeNewsletter(event)">
+            <input type="email" placeholder="Enter your email" required>
+            <button type="submit">Subscribe</button>
+        </form>
+    </div>
+
+    <!-- Contact Section -->
+    <section class="contact" id="contact">
+        <h2 class="section-title fade-in">Visit Us Today</h2>
+        <p class="section-subtitle fade-in">We'd love to see you!</p>
+        
+        <div class="contact-container fade-in">
+            <div class="contact-info">
+                <h3>Contact Information</h3>
+                <div class="info-item">
+                    <span>📍</span>
+                    <div>
+                        <strong>Address:</strong><br>
+                        123 Baker Street<br>
+                        Sweet Town, ST 12345
+                    </div>
+                </div>
+                <div class="info-item">
+                    <span>📞</span>
+                    <div>
+                        <strong>Phone:</strong><br>
+                        (555) 123-4567
+                    </div>
+                </div>
+                <div class="info-item">
+                    <span>✉️</span>
+                    <div>
+                        <strong>Email:</strong><br>
+                        hello@mimmisbakery.com
+                    </div>
+                </div>
+                <div class="info-item">
+                    <span>🕐</span>
+                    <div>
+                        <strong>Hours:</strong><br>
+                        Mon-Fri: 7AM - 8
